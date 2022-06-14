@@ -1,6 +1,7 @@
 import re
 import logging
 import sys
+import html
 
 '''
 parse_extract.py
@@ -17,6 +18,7 @@ The input file is in ./source; the files are created in ./output.
 #     Ver    Author          Date       Comments
 #     ===    =============== ========== =======================================
 ver = 0.1  # Adrian Powell   2022-06-11 Initial code
+ver = 0.2  # Adrian Powell   2022-06-13 Updated to exclude invalid chars from filename
 
 # Initialise logging module
 logging.root.handlers = []
@@ -39,7 +41,7 @@ def html_page_header(ticket_number):
     <!-- Bootstrap CSS -->
     <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css' rel='stylesheet' crossorigin='anonymous'>
 
-    <link rel='stylesheet' href='../jira.css'>
+    <link rel='stylesheet' href='./jira.css'>
         </head>
         <body>"""  # noqa 501
 
@@ -58,13 +60,13 @@ def main():
     # Open file
     # TODO: Support arguments for source file
     # TODO: Add check that source file exists
-    f = open('./source/B4CASMPI_AllQOZBTickets.htm',
+    f = open('./source/B4CASMPI_OpenTickets.htm',
              mode="r",
              encoding="utf-8")
     # TODO: Support arguments for output directory
     # TODO: Add check that output directory exists
     output_directory = './output'
-    
+
     hr_term = '<hr class=\'fullcontent\'>'
     h3_term = '<h3 class="formtitle">'
     table_term = '<table class="tableBorder"'
@@ -119,14 +121,28 @@ def main():
             # that should have been parsed.
             # TODO: Add checks that we have ticket_number and
             # ticket_title...revert to document number if not!
+
+            # Convert utf-8 string to ascii for filename
+            # tmp_data=ticket_title.decode("utf-8")
+            ticket_title_bytes = bytes(ticket_title, 'utf-8')
+            ticket_title_ascii = ticket_title_bytes.decode("ascii","ignore")
+
+            # Unescape htm sequences (like '&amp;' => '&')
+            ticket_title_ascii_unescaped = html.unescape(ticket_title_ascii)
+
+            # Handle characters that are no valid in filenames
+            character_list = ['*', '.', '"', '/', '\\', '[', ']', ':', ';', '|', ',', '>', '<', '?', '!', '&', '#']
+            for char in character_list:
+                ticket_title_ascii_unescaped = ticket_title_ascii_unescaped.replace(char,'_')
+
             output_filename = output_directory + '/' + \
                               ticket_number + \
-                              ' - ' + ticket_title + '.htm'
-            with open(output_filename, 'w') as f_output:
+                              ' - ' + ticket_title_ascii_unescaped + '.htm'
+            with open(output_filename, mode='w', encoding="utf-8") as f_output:
                 f_output.write(html_page_header(ticket_number))
                 f_output.write(current_document)
                 f_output.write(html_page_footer())
-            
+
             # TODO: update stats for documents created
 
             print('..line {}; document {} => {}'.format(line_number,
@@ -134,6 +150,10 @@ def main():
                                                         hr_term))
         # Add line to the current document
         current_document = current_document + '\n' + line
+
+    print('')
+    logging.info('Created {} documents.'.format(document_count))
+    print('')
 
     f.close()
 
