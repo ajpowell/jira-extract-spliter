@@ -128,4 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
-source/B4CASMPI_OpenTickets.htm
+source/
+attachments/
+tmp/
+output/
